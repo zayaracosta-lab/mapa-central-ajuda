@@ -1,4 +1,4 @@
-[mapa_combinado_v7.html](https://github.com/user-attachments/files/27414485/mapa_combinado_v7.html)<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
