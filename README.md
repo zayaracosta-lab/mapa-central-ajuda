@@ -1,3 +1,4 @@
+[mapa_v7_github.html](https://github.com/user-attachments/files/27414883/mapa_v7_github.html)
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -233,6 +234,7 @@ html,body{height:100%;overflow:hidden;font-family:'IBM Plex Sans',system-ui,sans
     <button class="tb-btn" id="btn-fit">⊡ Fit</button>
     <div class="sep"></div>
     <button class="tb-btn" id="btn-sync" onclick="syncData()" style="font-size:10px" title="Recarregar dados compartilhados">🔄 Sync</button>
+    <span id="storage-status" style="font-size:9px;padding:3px 8px;border-radius:10px;background:#f0ede7;color:#aaa;font-family:monospace;cursor:default" title="Status da persistência">⏳</span>
     <div id="search-wrap">
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" placeholder="Buscar artigo ou seção…">
@@ -803,101 +805,84 @@ const VALIDACOES = [
 // ═══════════════════════════════════════════════════════
 // COMMENTS SYSTEM
 // — Visíveis para todos (sem filtro por autor)
-// — Persistência em localStorage
-// — Vinculáveis a um nó específico ou gerais
 // ═══════════════════════════════════════════════════════
+// SHARED PERSISTENCE — JSONbin.io
+// Bin único e fixo — todos os visitantes leem e escrevem no mesmo lugar.
 // ═══════════════════════════════════════════════════════
-// SHARED PERSISTENCE — JSONbin.io (público, grátis)
-// Comentários e posições de nós são compartilhados entre todos os leitores.
-// O Bin ID fica em localStorage; na primeira abertura, um novo bin é criado
-// e a URL com o ID é exibida para ser compartilhada.
-// ═══════════════════════════════════════════════════════
+const JSONBIN_BIN_ID  = '69fa494236566621a82bb34e';  // ← substitua pelo seu Bin ID
 const JSONBIN_API_KEY = '$2a$10$MuqPEVxTnz8KhRaKzuv7OOEgE8fPlzJT0HabkNS9OP0oSl7KwNRHi';
-const JSONBIN_LS_KEY  = 'mapa_v6_bin_id';
+const JSONBIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
-let _binId = null;
-let _sharedData = { comments: [], offsets: {} };
-let _dataLoaded = false;
+let _sharedData  = { comments: [], offsets: {} };
+let _dataLoaded  = false;
+let _saveTimer   = null;
 
-function getBinUrl(id) { return `https://api.jsonbin.io/v3/b/${id}`; }
-
-async function ensureBin() {
-  // Try URL param first (for sharing)
-  const urlParams = new URLSearchParams(window.location.search);
-  const paramId = urlParams.get('bin');
-  if (paramId) { _binId = paramId; localStorage.setItem(JSONBIN_LS_KEY, paramId); return; }
-  // Then localStorage
-  _binId = localStorage.getItem(JSONBIN_LS_KEY);
-  if (_binId) return;
-  // Create a new bin
+// ── Carrega dados do bin compartilhado ──────────────────
+async function loadSharedData() {
   try {
-    const r = await fetch('https://api.jsonbin.io/v3/b', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_API_KEY,
-        'X-Bin-Name': 'mapa_combinado_v6',
-        'X-Private': 'false'
-      },
-      body: JSON.stringify({ comments: [], offsets: {} })
+    const r = await fetch(JSONBIN_URL + '/latest', {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' }
     });
     if (r.ok) {
       const json = await r.json();
-      _binId = json.metadata?.id;
-      if (_binId) {
-        localStorage.setItem(JSONBIN_LS_KEY, _binId);
-        // Show share hint
-        setTimeout(() => {
-          const shareUrl = window.location.href.split('?')[0] + '?bin=' + _binId;
-          const hint = document.createElement('div');
-          hint.style.cssText = 'position:fixed;bottom:60px;right:18px;background:#1e1c18;color:#f4f2ee;padding:10px 14px;border-radius:8px;font-size:11px;z-index:999;max-width:320px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-          hint.innerHTML = `🔗 <strong>Bin criado!</strong> Compartilhe este link para que outros vejam comentários e posições:<br><a href="${shareUrl}" style="color:#f5c842;word-break:break-all">${shareUrl}</a><br><button onclick="this.parentNode.remove()" style="margin-top:6px;border:none;background:#444;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:10px">Fechar</button>`;
-          document.body.appendChild(hint);
-        }, 1500);
-      }
+      _sharedData = json.record || { comments: [], offsets: {} };
+      if (!Array.isArray(_sharedData.comments)) _sharedData.comments = [];
+      if (!_sharedData.offsets || typeof _sharedData.offsets !== 'object') _sharedData.offsets = {};
+      // Aplica posições de nós salvas
+      Object.entries(_sharedData.offsets).forEach(([k,v]) => { nodeOffsets[k] = v; });
     }
-  } catch(e) { console.warn('JSONbin create failed', e); }
-}
-
-async function loadSharedData() {
-  await ensureBin();
-  if (_binId) {
-    try {
-      const r = await fetch(getBinUrl(_binId) + '/latest', {
-        headers: { 'X-Master-Key': JSONBIN_API_KEY }
-      });
-      if (r.ok) {
-        const json = await r.json();
-        _sharedData = json.record || { comments: [], offsets: {} };
-        if (!_sharedData.comments) _sharedData.comments = [];
-        if (!_sharedData.offsets)  _sharedData.offsets  = {};
-        Object.assign(nodeOffsets, _sharedData.offsets);
-      }
-    } catch(e) { console.warn('JSONbin load failed, fallback to localStorage', e); }
+  } catch(e) {
+    console.warn('[mapa] JSONbin load falhou, usando localStorage:', e.message);
   }
-  // localStorage fallback
+  // Fallback localStorage (mesmo que o bin carregue vazio)
   if (!_sharedData.comments.length) {
-    try { _sharedData.comments = JSON.parse(localStorage.getItem('mapa_v6_comments') || '[]'); } catch(e){}
-  }
-  if (!Object.keys(_sharedData.offsets||{}).length) {
-    try { Object.assign(nodeOffsets, JSON.parse(localStorage.getItem('mapa_v6_offsets') || '{}')); } catch(e){}
+    try { _sharedData.comments = JSON.parse(localStorage.getItem('mapa_v7_comments') || '[]'); } catch(_){}
   }
   _dataLoaded = true;
+  updateStorageStatus();
 }
 
+// ── Salva dados no bin compartilhado (com debounce) ─────
 async function saveSharedData() {
-  _sharedData.offsets = {...nodeOffsets};
-  // localStorage fallback always
-  try { localStorage.setItem('mapa_v6_comments', JSON.stringify(_sharedData.comments)); } catch(e){}
-  try { localStorage.setItem('mapa_v6_offsets', JSON.stringify(nodeOffsets)); } catch(e){}
-  if (!_binId) return;
-  try {
-    await fetch(getBinUrl(_binId), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
-      body: JSON.stringify(_sharedData)
-    });
-  } catch(e) { console.warn('JSONbin save failed', e); }
+  _sharedData.offsets = { ...nodeOffsets };
+  // Sempre salva local como backup
+  try { localStorage.setItem('mapa_v7_comments', JSON.stringify(_sharedData.comments)); } catch(_){}
+  try { localStorage.setItem('mapa_v7_offsets',  JSON.stringify(nodeOffsets)); } catch(_){}
+  // Debounce 800ms para não spammar durante arrastos
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    if (JSONBIN_BIN_ID === 'SEU_BIN_ID_AQUI') return; // bin não configurado
+    try {
+      const r = await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+        body: JSON.stringify(_sharedData)
+      });
+      if (!r.ok) console.warn('[mapa] JSONbin save status:', r.status);
+      else updateStorageStatus();
+    } catch(e) { console.warn('[mapa] JSONbin save falhou:', e.message); }
+  }, 800);
+}
+
+// ── Indicador visual de status ─────────────────────────
+function updateStorageStatus() {
+  const el = document.getElementById('storage-status');
+  if (!el) return;
+  if (JSONBIN_BIN_ID === 'SEU_BIN_ID_AQUI') {
+    el.textContent = '🔴 Sem bin';
+    el.style.cssText += ';background:#fde8e8;color:#9b1c1c';
+    el.title = 'Configure o JSONBIN_BIN_ID no HTML para ativar o compartilhamento.';
+  } else {
+    el.textContent = '🟢 Compartilhado';
+    el.style.cssText += ';background:#d1fae5;color:#065f46';
+    el.title = 'Dados sincronizados com todos os leitores. Bin: ' + JSONBIN_BIN_ID;
+  }
+}
+
+function loadComments()    { return Array.isArray(_sharedData.comments) ? _sharedData.comments : []; }
+function saveComments(list) {
+  _sharedData.comments = list;
+  saveSharedData();
 }
 
 let activeCommentNode = null; // {id, label, type} | null
