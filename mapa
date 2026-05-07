@@ -150,6 +150,42 @@ html,body{height:100%;overflow:hidden;font-family:'IBM Plex Sans',system-ui,sans
 .sr-name{font-weight:500;color:#1e1c18}
 .sr-cat{font-size:10px;color:#aaa}
 .sr-art{font-size:10px;color:#888;font-style:italic;margin-top:1px}
+/* ── SHARE BANNER ── */
+#share-banner{
+  position:fixed;top:44px;left:0;right:0;z-index:500;
+  background:#fffbe6;border-bottom:2px solid #f5c842;
+  padding:7px 16px;display:flex;align-items:center;gap:10px;font-size:11.5px;color:#7a5f00;
+}
+#share-banner strong{font-weight:700}
+#share-banner a{color:#b07800;font-weight:600;cursor:pointer;text-decoration:underline}
+#share-banner .sb-close{margin-left:auto;cursor:pointer;font-size:13px;color:#bbb;padding:0 4px;border:none;background:none}
+#share-banner .sb-close:hover{color:#888}
+
+/* ── SHARE MODAL ── */
+#share-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:none;
+  align-items:center;justify-content:center;
+}
+#share-overlay.open{display:flex}
+#share-modal{
+  background:#fff;border-radius:12px;padding:24px;width:480px;max-width:95vw;
+  box-shadow:0 8px 40px rgba(0,0,0,.18);font-family:'IBM Plex Sans',sans-serif;
+}
+#share-modal h2{font-size:15px;font-weight:700;color:#1e1c18;margin-bottom:4px}
+#share-modal p{font-size:11.5px;color:#777;margin-bottom:14px;line-height:1.6}
+.sm-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#aaa;margin-bottom:5px}
+.sm-url-row{display:flex;gap:6px;margin-bottom:16px}
+.sm-url-row input{flex:1;border:1px solid #e0ddd6;border-radius:6px;padding:7px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:#333;background:#f9f8f6;outline:none}
+.sm-url-row button{padding:7px 13px;border-radius:6px;border:none;background:#1e1c18;color:#fff;font-size:11px;cursor:pointer;white-space:nowrap}
+.sm-url-row button:hover{background:#333}
+.sm-divider{height:1px;background:#f0ede7;margin:14px 0}
+.sm-status{font-size:11px;padding:8px 11px;border-radius:6px;margin-bottom:12px}
+.sm-status.ok{background:#edf7ed;color:#2e6e2e;border:1px solid #b6ddb6}
+.sm-status.warn{background:#fff3cd;color:#7a5f00;border:1px solid #f5c842}
+.sm-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.sm-btn-sec{padding:7px 14px;border-radius:6px;border:1px solid #e0ddd6;background:#fff;font-size:11px;color:#555;cursor:pointer}
+.sm-btn-sec:hover{background:#f4f2ee}
+
 /* ── COMMENTS PANEL ── */
 #comments-panel{
   position:fixed;top:44px;left:200px;width:340px;bottom:0;background:#fff;
@@ -233,6 +269,7 @@ html,body{height:100%;overflow:hidden;font-family:'IBM Plex Sans',system-ui,sans
     <button class="tb-btn" id="btn-fit">⊡ Fit</button>
     <div class="sep"></div>
     <button class="tb-btn" id="btn-sync" onclick="syncData()" style="font-size:10px" title="Recarregar dados compartilhados">🔄 Sync</button>
+    <button class="tb-btn" id="btn-share" onclick="openShareModal()" style="font-size:10px;background:#fffbe6;border-color:#f5c842;color:#7a5f00" title="Link compartilhável do time">🔗 Link do Time</button>
     <div id="search-wrap">
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" placeholder="Buscar artigo ou seção…">
@@ -825,7 +862,7 @@ async function ensureBin() {
   // Try URL param first (for sharing)
   const urlParams = new URLSearchParams(window.location.search);
   const paramId = urlParams.get('bin');
-  if (paramId) { _binId = paramId; localStorage.setItem(JSONBIN_LS_KEY, paramId); return; }
+  if (paramId) { _binId = paramId; _binFromUrl = true; localStorage.setItem(JSONBIN_LS_KEY, paramId); return; }
   // Then localStorage
   _binId = localStorage.getItem(JSONBIN_LS_KEY);
   if (_binId) return;
@@ -883,6 +920,7 @@ async function loadSharedData() {
     try { Object.assign(nodeOffsets, JSON.parse(localStorage.getItem('mapa_v6_offsets') || '{}')); } catch(e){}
   }
   _dataLoaded = true;
+  setTimeout(showShareBanner, 800);
 }
 
 async function saveSharedData() {
@@ -917,6 +955,65 @@ function saveComments(list) {
   _sharedData.comments = list;
   saveSharedData();
   try { localStorage.setItem('mapa_v6_comments', JSON.stringify(list)); } catch(e){}
+}
+
+
+// ═══════════════════════════════════════════════════════
+// SHARE MODAL & BIN MANAGEMENT
+// ═══════════════════════════════════════════════════════
+let _binFromUrl = false;
+
+function getShareUrl(binId) {
+  const base = window.location.href.split('?')[0];
+  return binId ? base + '?bin=' + binId : base;
+}
+
+function openShareModal() {
+  const overlay = document.getElementById('share-overlay');
+  const urlInput = document.getElementById('sm-url-input');
+  const statusEl = document.getElementById('sm-status');
+  const shareUrl = getShareUrl(_binId);
+  urlInput.value = shareUrl;
+
+  if (_binFromUrl) {
+    statusEl.className = 'sm-status ok';
+    statusEl.innerHTML = '✅ <strong>Você está no espaço compartilhado do time.</strong> Copie o link acima e distribua para os membros.';
+  } else {
+    statusEl.className = 'sm-status warn';
+    statusEl.innerHTML = '⚠️ <strong>Espaço local (não compartilhado).</strong> Copie o link acima e envie para o time. Eles devem abrir exatamente esse link para sincronizar com você.';
+  }
+  overlay.classList.add('open');
+}
+
+function closeShareModal() {
+  document.getElementById('share-overlay').classList.remove('open');
+}
+
+function copyShareUrl() {
+  const url = document.getElementById('sm-url-input').value;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.querySelector('#share-modal .sm-url-row button');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copiado!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function applyBinId() {
+  const input = document.getElementById('sm-bin-input').value.trim();
+  if (!input) return;
+  const newUrl = getShareUrl(input);
+  window.location.href = newUrl;
+}
+
+function showShareBanner() {
+  const banner = document.getElementById('share-banner');
+  if (banner && !_binFromUrl) {
+    banner.style.display = 'flex';
+    // Push app down
+    const app = document.getElementById('app');
+    if (app) app.style.top = (44 + banner.offsetHeight) + 'px';
+  }
 }
 
 async function syncData() {
@@ -1680,7 +1777,40 @@ function buildHalfHTML(mode) {
     html += `</div>`;
   }
 
-  html += `</body></html>`;
+  html += `
+<!-- ── SHARE BANNER ── -->
+<div id="share-banner" style="display:none">
+  ⚠️ <strong>Você está usando um espaço local,</strong> não o espaço compartilhado do time.
+  Seus comentários e posições <strong>não serão vistos pelos outros</strong>.
+  <a onclick="openShareModal()">Ver como sincronizar →</a>
+  <button class="sb-close" onclick="document.getElementById('share-banner').style.display='none'">✕</button>
+</div>
+
+<!-- ── SHARE MODAL ── -->
+<div id="share-overlay" onclick="if(event.target===this)closeShareModal()">
+  <div id="share-modal">
+    <h2>🔗 Link Compartilhado do Time</h2>
+    <p>Para que todos do time vejam os mesmos comentários e posições dos nós, todos precisam abrir o mesmo link com o <strong>Bin ID</strong> do time.</p>
+    <div class="sm-label">Seu link compartilhável atual</div>
+    <div class="sm-url-row">
+      <input type="text" id="sm-url-input" readonly>
+      <button onclick="copyShareUrl()">📋 Copiar</button>
+    </div>
+    <div id="sm-status" class="sm-status warn"></div>
+    <div class="sm-divider"></div>
+    <div class="sm-label">Usar Bin ID de outro membro do time</div>
+    <p style="margin-bottom:8px">Cole o Bin ID que alguém do time te enviou para sincronizar com o espaço deles:</p>
+    <div class="sm-url-row">
+      <input type="text" id="sm-bin-input" placeholder="Ex: 6832abc1acd3cb34a8b12345" style="font-family:'IBM Plex Mono',monospace">
+      <button onclick="applyBinId()">✅ Aplicar</button>
+    </div>
+    <div class="sm-actions">
+      <button class="sm-btn-sec" onclick="closeShareModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+</body></html>`;
   return html;
 }
 
