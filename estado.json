@@ -1,5 +1,29 @@
 {
-  "comments": [],
-  "offsets": {},
-  "publishedAt": null
+  "comments": [
+    {
+      "id": "1778175475020_g60i8",
+      "author": "Anônimo",
+      "text": "Teste",
+      "nodeId": null,
+      "nodeLabel": null,
+      "nodeType": null,
+      "ts": "2026-05-07T17:37:55.020Z",
+      "pinned": false
+    }
+  ],
+  "offsets": {
+    "m2_l4": {
+      "dx": 1881.6279623899518,
+      "dy": 1752.441564972134
+    },
+    "intro_l1": {
+      "dx": 1.096487039346357,
+      "dy": -31.249880621371478
+    },
+    "intro_l0": {
+      "dx": -0.5482435196731785,
+      "dy": 26.863932463986007
+    }
+  },
+  "publishedAt": "2026-05-07T17:56:09.191Z"
 }
