@@ -2862,7 +2862,16 @@ document.getElementById('btn-expand').addEventListener('click',()=>{
   collapsedCats.clear();collapsedMods.clear();render();fitView(false);
 });
 document.getElementById('btn-collapse').addEventListener('click',()=>{
-  CATS.forEach(c=>collapsedCats.add(c.id));
+  // Collapse NEWCATS: categories, sections, sub1s
+  for (const cat of NEWCATS) {
+    collapsedCats.add('cat_' + cat.category.replace(/\W/g,'').slice(0,20));
+    for (const sec of cat.sections) {
+      collapsedCats.add('sec_' + sec.name.replace(/\W/g,'').slice(0,20));
+      for (const sub1 of (sec.subsections||[])) {
+        collapsedCats.add('sub1_' + sub1.name.replace(/\W/g,'').slice(0,20));
+      }
+    }
+  }
   MODS.forEach(m=>collapsedMods.add(m.id));
   render();fitView(false);
 });
