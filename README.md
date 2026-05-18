@@ -2273,7 +2273,17 @@ function renderCANode(n) {
     el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3;pointer-events:none">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45);pointer-events:none">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
     el.title = n.collapsed ? 'Clique para expandir categorias' : 'Clique para recolher categorias';
     el.addEventListener('click', () => {
-      caRootCollapsed = !caRootCollapsed;
+      if (caRootCollapsed) {
+        // Opening: show categories but keep them collapsed (only first level)
+        caRootCollapsed = false;
+        for (const cat of NEWCATS) {
+          collapsedCats.add('cat_' + cat.category.replace(/\W/g,'').slice(0,20));
+        }
+      } else {
+        // Closing: hide everything under root
+        caRootCollapsed = true;
+        collapsedCats.clear();
+      }
       render(); fitView(false);
     });
 
@@ -2284,7 +2294,16 @@ function renderCANode(n) {
     el.innerHTML = `<span style="font-size:11px;font-weight:700;color:#fff;line-height:1.2;flex:1;letter-spacing:.01em">${truncate(n.label,30)}</span>
       <span style="font-size:9px;color:rgba(255,255,255,0.6);margin-left:4px">${n.collapsed?'▶':'▼'}</span>`;
     el.addEventListener('click', () => {
-      collapsedCats.has(n.id) ? collapsedCats.delete(n.id) : collapsedCats.add(n.id);
+      if (collapsedCats.has(n.id)) {
+        // Opening: show sections but keep them collapsed (only one level at a time)
+        collapsedCats.delete(n.id);
+        const cat = NEWCATS.find(c => c.category === n.catName);
+        for (const sec of (cat ? cat.sections : [])) {
+          collapsedCats.add('sec_' + sec.name.replace(/\W/g,'').slice(0,20));
+        }
+      } else {
+        collapsedCats.add(n.id);
+      }
       render(); fitView(false);
     });
     el.title = n.label;
@@ -2305,8 +2324,19 @@ function renderCANode(n) {
     el.addEventListener('click', e => {
       if(Math.abs(e.movementX||0)<3 && Math.abs(e.movementY||0)<3){
         e.stopPropagation();
-        // Toggle collapse
-        collapsedCats.has(n.id) ? collapsedCats.delete(n.id) : collapsedCats.add(n.id);
+        // Toggle collapse — when opening, show sub1s collapsed (one level at a time)
+        if (collapsedCats.has(n.id)) {
+          collapsedCats.delete(n.id);
+          // Find this sec's sub1s and collapse them so only sub1 labels appear
+          const cat = NEWCATS.find(c => c.category === n.catName);
+          const sec = cat ? cat.sections.find(s => s.name === n.label) : null;
+          for (const sub1 of (sec ? sec.subsections || [] : [])) {
+            if (sub1.subsections && sub1.subsections.length)
+              collapsedCats.add('sub1_' + sub1.name.replace(/\W/g,'').slice(0,20));
+          }
+        } else {
+          collapsedCats.add(n.id);
+        }
         render(); fitView(false);
       }
     });
@@ -2427,7 +2457,15 @@ function renderTRNode(n) {
     el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3;pointer-events:none">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45);pointer-events:none">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
     el.title = n.collapsed ? 'Clique para expandir módulos' : 'Clique para recolher módulos';
     el.addEventListener('click', () => {
-      trRootCollapsed = !trRootCollapsed;
+      if (trRootCollapsed) {
+        // Opening: show modules but keep lessons hidden (only first level)
+        trRootCollapsed = false;
+        MODS.forEach(m => collapsedMods.add(m.id));
+      } else {
+        // Closing: hide all modules
+        trRootCollapsed = true;
+        collapsedMods.clear();
+      }
       render(); fitView(false);
     });
 
