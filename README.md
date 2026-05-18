@@ -1555,6 +1555,7 @@ const CA_COLORS = {
 
 let collapsedCats = new Set();
 let collapsedMods = new Set();
+let trRootCollapsed = false; // when true, hide all TR modules
 let selectedNode = null;
 let showConnections = true;
 
@@ -1704,11 +1705,15 @@ function computeCA(offsetX=20) {
 
 
 function computeTR(offsetX) {
-  const totalH = MODS.reduce((s,m) => s + modHeight(m) + V_GAP_MOD, 0) - V_GAP_MOD;
+  const totalH = trRootCollapsed ? ROOT_H : MODS.reduce((s,m) => s + modHeight(m) + V_GAP_MOD, 0) - V_GAP_MOD;
   const rootCY = totalH / 2;
   const nodes = [];
   const rootX = offsetX;
-  nodes.push({type:'root-tr', x:rootX, y:rootCY - ROOT_H/2, w:ROOT_W, h:ROOT_H, label:'Portal do\nCurso', id:'root-tr'});
+  nodes.push({type:'root-tr', x:rootX, y:rootCY - ROOT_H/2, w:ROOT_W, h:ROOT_H, label:'Portal do\nCurso', id:'root-tr', collapsed:trRootCollapsed});
+  if (trRootCollapsed) {
+    const trWidth = ROOT_W;
+    return { nodes, trWidth, trHeight: totalH, rootCY };
+  }
 
   let curY = 0;
   for (const mod of MODS) {
@@ -2406,8 +2411,13 @@ function renderTRNode(n) {
   el.style.cssText = `position:absolute;left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;`;
 
   if (n.type === 'root-tr') {
-    el.style.cssText += `background:#1a1916;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:default;`;
-    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3">${n.label.replace('\n','<br>')}</span>`;
+    el.style.cssText += `background:#1a1916;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;flex-direction:column;gap:2px;`;
+    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45)">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
+    el.title = n.collapsed ? 'Clique para expandir módulos' : 'Clique para recolher módulos';
+    el.addEventListener('click', () => {
+      trRootCollapsed = !trRootCollapsed;
+      render(); fitView(false);
+    });
 
   } else if (n.type === 'mod') {
     const sumInfo = MOD_SUMMARIES[n.id] || {};
@@ -2734,7 +2744,7 @@ window.addEventListener('mouseup', e => {
 // Reset node positions button
 document.getElementById('btn-reset').addEventListener('click', () => {
   Object.keys(nodeOffsets).forEach(k => delete nodeOffsets[k]);
-  collapsedCats.clear(); collapsedMods.clear(); render(); fitView();
+  collapsedCats.clear(); collapsedMods.clear(); trRootCollapsed=false; render(); fitView();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -2859,10 +2869,10 @@ document.getElementById('btn-reset').addEventListener('click',()=>{
   // Handled above (clears node offsets too)
 });
 document.getElementById('btn-expand').addEventListener('click',()=>{
-  collapsedCats.clear();collapsedMods.clear();render();fitView(false);
+  collapsedCats.clear();collapsedMods.clear();trRootCollapsed=false;render();fitView(false);
 });
 document.getElementById('btn-collapse').addEventListener('click',()=>{
-  // Collapse NEWCATS: categories, sections, sub1s
+  // Collapse CA: categories, sections, sub1s
   for (const cat of NEWCATS) {
     collapsedCats.add('cat_' + cat.category.replace(/\W/g,'').slice(0,20));
     for (const sec of cat.sections) {
@@ -2872,7 +2882,8 @@ document.getElementById('btn-collapse').addEventListener('click',()=>{
       }
     }
   }
-  MODS.forEach(m=>collapsedMods.add(m.id));
+  // Collapse Treinamentos root (hides all modules)
+  trRootCollapsed = true;
   render();fitView(false);
 });
 document.getElementById('show-connections').addEventListener('change', e=>{
