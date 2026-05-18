@@ -1556,6 +1556,7 @@ const CA_COLORS = {
 let collapsedCats = new Set();
 let collapsedMods = new Set();
 let trRootCollapsed = false; // when true, hide all TR modules
+let caRootCollapsed = false;  // when true, hide all CA categories
 let selectedNode = null;
 let showConnections = true;
 
@@ -1610,11 +1611,15 @@ function modHeight(mod) {
 
 function computeCA(offsetX=20) {
   // 5-level: Root → Category → Section → Sub1 → Sub2
-  const totalH = NEWCATS.reduce((s,cat) => s + catHeight2(cat) + V_GAP_CAT, 0) - V_GAP_CAT;
+  const totalH = caRootCollapsed ? ROOT_H : NEWCATS.reduce((s,cat) => s + catHeight2(cat) + V_GAP_CAT, 0) - V_GAP_CAT;
   const rootCY = totalH / 2;
   const nodes = [];
   const rootX = offsetX, rootY = rootCY - ROOT_H/2;
-  nodes.push({type:'root-ca', x:rootX, y:rootY, w:ROOT_W, h:ROOT_H, label:'Central\nde Ajuda', id:'root-ca'});
+  nodes.push({type:'root-ca', x:rootX, y:rootY, w:ROOT_W, h:ROOT_H, label:'Central\nde Ajuda', id:'root-ca', collapsed:caRootCollapsed});
+  if (caRootCollapsed) {
+    const caWidth = ROOT_W;
+    return { nodes, caWidth, caHeight: totalH, rootCY };
+  }
 
   let curY = 0;
   let catIdx = 0;
@@ -2263,8 +2268,14 @@ function renderCANode(n) {
   el.style.cssText = `position:absolute;left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;`;
 
   if (n.type === 'root-ca') {
-    el.style.cssText += `background:#1e1c18;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:default;`;
-    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3">${n.label.replace('\n','<br>')}</span>`;
+    el.style.cssText += `background:#1e1c18;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;flex-direction:column;gap:2px;`;
+    el.setAttribute('data-node','root-ca');
+    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3;pointer-events:none">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45);pointer-events:none">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
+    el.title = n.collapsed ? 'Clique para expandir categorias' : 'Clique para recolher categorias';
+    el.addEventListener('click', () => {
+      caRootCollapsed = !caRootCollapsed;
+      render(); fitView(false);
+    });
 
   } else if (n.type === 'cat-ng') {
     // Category node (Conta Azul Pro / Conta Azul Mais) — darkest blue
@@ -2412,7 +2423,8 @@ function renderTRNode(n) {
 
   if (n.type === 'root-tr') {
     el.style.cssText += `background:#1a1916;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;flex-direction:column;gap:2px;`;
-    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45)">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
+    el.setAttribute('data-node','root-tr');
+    el.innerHTML = `<span style="font-size:11px;font-weight:600;color:#f4f2ee;text-align:center;line-height:1.3;pointer-events:none">${n.label.replace('\n','<br>')}</span><span style="font-size:8px;color:rgba(255,255,255,0.45);pointer-events:none">${n.collapsed?'▶ expandir':'▼ recolher'}</span>`;
     el.title = n.collapsed ? 'Clique para expandir módulos' : 'Clique para recolher módulos';
     el.addEventListener('click', () => {
       trRootCollapsed = !trRootCollapsed;
@@ -2744,7 +2756,7 @@ window.addEventListener('mouseup', e => {
 // Reset node positions button
 document.getElementById('btn-reset').addEventListener('click', () => {
   Object.keys(nodeOffsets).forEach(k => delete nodeOffsets[k]);
-  collapsedCats.clear(); collapsedMods.clear(); trRootCollapsed=false; render(); fitView();
+  collapsedCats.clear(); collapsedMods.clear(); trRootCollapsed=false; caRootCollapsed=false; render(); fitView();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -2869,20 +2881,13 @@ document.getElementById('btn-reset').addEventListener('click',()=>{
   // Handled above (clears node offsets too)
 });
 document.getElementById('btn-expand').addEventListener('click',()=>{
-  collapsedCats.clear();collapsedMods.clear();trRootCollapsed=false;render();fitView(false);
+  collapsedCats.clear();collapsedMods.clear();trRootCollapsed=false;caRootCollapsed=false;render();fitView(false);
 });
 document.getElementById('btn-collapse').addEventListener('click',()=>{
-  // Collapse CA: categories, sections, sub1s
-  for (const cat of NEWCATS) {
-    collapsedCats.add('cat_' + cat.category.replace(/\W/g,'').slice(0,20));
-    for (const sec of cat.sections) {
-      collapsedCats.add('sec_' + sec.name.replace(/\W/g,'').slice(0,20));
-      for (const sub1 of (sec.subsections||[])) {
-        collapsedCats.add('sub1_' + sub1.name.replace(/\W/g,'').slice(0,20));
-      }
-    }
-  }
-  // Collapse Treinamentos root (hides all modules)
+  // Collapse CA to root only
+  caRootCollapsed = true;
+  collapsedCats.clear(); // clear deep-collapse state so expand shows everything
+  // Collapse Treinamentos to root only
   trRootCollapsed = true;
   render();fitView(false);
 });
