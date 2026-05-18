@@ -2734,19 +2734,13 @@ function getNodeOffset(id) {
     } catch(e){}
   }
 
-  // ── DEFAULT INITIAL STATE: match the "expanded overview" layout ──
+  // ── DEFAULT INITIAL STATE: "overview" layout ──
   // TR: all modules collapsed (show module names only, no lessons)
   for (const mod of MODS) collapsedMods.add(mod.id);
-  // CA: categories expanded, sections visible, but sub1s collapsed
+  // CA: categories expanded, sections visible with arts count + ▶, sub1s hidden
   for (const ncat of NEWCATS) {
-    // Category open (don't collapse it)
     for (const sec of ncat.sections) {
-      // Section visible but its sub1 children collapsed
-      for (const sub1 of (sec.subsections || [])) {
-        if (sub1.subsections && sub1.subsections.length) {
-          collapsedCats.add('sub1_' + sub1.name.replace(/\W/g,'').slice(0,20));
-        }
-      }
+      collapsedCats.add('sec_' + sec.name.replace(/\W/g,'').slice(0,20));
     }
   }
 
@@ -2939,11 +2933,19 @@ document.getElementById('btn-expand').addEventListener('click',()=>{
   collapsedCats.clear();collapsedMods.clear();trRootCollapsed=false;caRootCollapsed=false;render();fitView(false);
 });
 document.getElementById('btn-collapse').addEventListener('click',()=>{
-  // Collapse CA to root only
-  caRootCollapsed = true;
-  collapsedCats.clear(); // clear deep-collapse state so expand shows everything
-  // Collapse Treinamentos to root only
-  trRootCollapsed = true;
+  // Collapse to "overview" level: CA sections visible but sub1s collapsed, TR modules collapsed
+  caRootCollapsed = false;
+  trRootCollapsed = false;
+  collapsedCats.clear();
+  collapsedMods.clear();
+  // TR: collapse all modules (hide lessons)
+  for (const mod of MODS) collapsedMods.add(mod.id);
+  // CA: sections visible, but all secs collapsed (hide sub1s)
+  for (const ncat of NEWCATS) {
+    for (const sec of ncat.sections) {
+      collapsedCats.add('sec_' + sec.name.replace(/\W/g,'').slice(0,20));
+    }
+  }
   render();fitView(false);
 });
 document.getElementById('show-connections').addEventListener('change', e=>{
