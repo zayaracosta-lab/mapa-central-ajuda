@@ -2733,6 +2733,23 @@ function getNodeOffset(id) {
       Object.assign(nodeOffsets, saved);
     } catch(e){}
   }
+
+  // ── DEFAULT INITIAL STATE: match the "expanded overview" layout ──
+  // TR: all modules collapsed (show module names only, no lessons)
+  for (const mod of MODS) collapsedMods.add(mod.id);
+  // CA: categories expanded, sections visible, but sub1s collapsed
+  for (const ncat of NEWCATS) {
+    // Category open (don't collapse it)
+    for (const sec of ncat.sections) {
+      // Section visible but its sub1 children collapsed
+      for (const sub1 of (sec.subsections || [])) {
+        if (sub1.subsections && sub1.subsections.length) {
+          collapsedCats.add('sub1_' + sub1.name.replace(/\W/g,'').slice(0,20));
+        }
+      }
+    }
+  }
+
   render();
   fitView();
   updateCommentDots();
